@@ -1,0 +1,70 @@
+<html>
+<head>
+    <style type="text/css">
+      #drop_zone {
+      border: 2px dashed #BBBBBB;
+      border-radius: 5px;
+      color: #BBBBBB;
+      padding: 25px;
+      text-align: center;
+      width: 30%;
+      margin: 0 auto;
+    }
+</style>
+
+<script type="text/javascript" src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/aes.js" /></script>
+<script type="text/javascript" src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/components/mode-ecb-min.js"></script>
+<script type="text/javascript" src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/components/pad-nopadding-min.js"></script>
+<script type="text/javascript" src="./FileUtils.js"></script>
+<script type="text/javascript" src="./CCM.js"></script>
+
+
+</head>
+<body>
+  <h1 style="text-align: center">CCM Mode</h1>
+<div id="drop_zone">Drop files here</div>
+<output id="list"></output>
+
+<script>
+  
+  function handleFileSelect(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+
+    var files = evt.dataTransfer.files; // FileList object.
+
+    // files is a FileList of File objects. List some properties.
+    var output = [];
+    
+    var key = FileUtils.toByteArray('a2d0136b2f2bd7efb4d9bc91c0cd7c02');
+    var iv = FileUtils.toByteArray('6332383534303366');
+    var adata = FileUtils.toByteArray('61757468656e7469636174696f6e2064617461');
+    
+
+    
+    for (var i = 0, f; f = files[i]; i++) {
+      var ccm = new CCM(key, iv, adata, 16, f.size);
+      FileUtils.readNextBytes(f, 0, FileUtils.buffer_size-1, function(result) {
+          
+      });  
+    }
+    document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';
+}
+  
+
+
+
+function handleDragOver(evt) {
+  evt.stopPropagation();
+  evt.preventDefault();
+  evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+}
+
+// Setup the dnd listeners.
+var dropZone = document.getElementById('drop_zone');
+dropZone.addEventListener('dragover', handleDragOver, false);
+dropZone.addEventListener('drop', handleFileSelect, false);
+
+</script>
+</body>
+</html>
