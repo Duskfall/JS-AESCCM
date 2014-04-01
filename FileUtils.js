@@ -12,7 +12,7 @@ FileUtils.readBytes = function(file, from, to, done) {
     
         reader.onloadend = function(evt) {
             if (evt.target.readyState == FileReader.DONE) {
-                done(new Int8Array(evt.target.result));
+                done(new Uint8Array(evt.target.result));
             }
         }
     })(file);
@@ -50,7 +50,7 @@ FileUtils.toHex = function(array) {
  
 FileUtils.toByteArray = function(hex) {
     var size = hex.length/2;
-    var bytes = Uint8Array(size);
+    var bytes = new Uint8Array(size);
     for (var j = 0; j < size; j++) {
       bytes[j] = parseInt(hex.substr(j*2, 2), 16);
     }
@@ -59,7 +59,7 @@ FileUtils.toByteArray = function(hex) {
  
 FileUtils.base64ToByteArray = function(data) {
     var decoded = atob(data);
-    var bytes = Uint8Array(decoded.length);
+    var bytes = new Uint8Array(decoded.length);
     for (var i = 0; i < decoded.length; i++) {
         bytes[i] = decoded.charCodeAt(i);
     }

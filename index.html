@@ -44,7 +44,8 @@
     
     for (var i = 0, f; f = files[i]; i++) {
       var ccm = new CCM(key, iv, adata, 16, f.size);
-      FileUtils.readNextBytes(f, 0, FileUtils.buffer_size-1, function(result) {
+      FileUtils.readNextBytes(f, 0, FileUtils.buffer_size, function(result) {
+          ccm.encryptBlock(result);
           
       });  
     }
