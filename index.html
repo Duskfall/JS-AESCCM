@@ -15,6 +15,7 @@
 <script type="text/javascript" src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/aes.js" /></script>
 <script type="text/javascript" src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/components/mode-ecb-min.js"></script>
 <script type="text/javascript" src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/components/pad-nopadding-min.js"></script>
+<script type="text/javascript" src="https://rawgithub.com/bitwiseshiftleft/sjcl/master/sjcl.js"></script>
 <script type="text/javascript" src="./FileUtils.js"></script>
 <script type="text/javascript" src="./CCM.js"></script>
 
@@ -45,8 +46,14 @@
     for (var i = 0, f; f = files[i]; i++) {
       var ccm = new CCM(key, iv, adata, 16, f.size);
       FileUtils.readNextBytes(f, 0, FileUtils.buffer_size, function(result) {
-          ccm.encryptBlock(result);
-          
+          var encrypted = ccm.encryptBlock(result);
+          if (ccm.exit_next == 1) {
+            //Telos -> pairnw to tag
+            var tag = ccm.getTag();
+            //edw anevazeis to tag ston server
+            
+            console.log("Tag: " + FileUtils.toHex(tag));
+          }
       });  
     }
     document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';

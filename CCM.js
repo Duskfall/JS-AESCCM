@@ -1,3 +1,6 @@
+CCM.block_size = 16;
+CCM.blocks_count = 1024 * 1;
+
 function CCM(key, iv, adata, tag_length, filesize) {
     this.key = key;
     this.iv = iv;
@@ -7,23 +10,16 @@ function CCM(key, iv, adata, tag_length, filesize) {
     this.bytes_left = filesize;
     this.exit_next = -1;
     
-    this.CC = new Uint8Array(CCM.block_size * CCM.blocks_count);
+    this.CC = new Uint8Array(this.tag_length + filesize );
     this.Y = new Uint8Array(CCM.block_size);
-    this.S0 = new Uint8Array(CCM.block_size);
     
     this.char_ctr = this.generate_counter_block();
-    this.char_ctr_cipher = this.AESEncryptBlock(this.char_ctr);
-    
-    //console.log(FileUtils.toHex(FileUtils.base64ToByteArray(this.char_ctr_cipher.toString())));
+    this.S0 = this.AESEncryptBlock(this.char_ctr);
     
     for (var i = 0; i < this.Y.length; i++) {
         this.Y[i] = 0x0;
     }
 }
-
-CCM.block_size = 16;
-CCM.blocks_count = 1024;
-
 CCM.prototype.generate_counter_block = function(buffer) {
     buffer = new Uint8Array(CCM.block_size); 
     
@@ -31,7 +27,6 @@ CCM.prototype.generate_counter_block = function(buffer) {
     var fl = 0x00;
     
     fl |= (q_len - 1) & 0x07;
-    
     buffer[0] = fl;
     
     for (var i = 0; i < this.iv.length; i++) {
@@ -45,9 +40,9 @@ CCM.prototype.generate_counter_block = function(buffer) {
     return buffer;
 }
 
-CCM.prototype.getTag = function(){
-    var tagBuffer = new Uint8Array(CCM.block_size);
-    //this.bytesXorWithBytes:this.Y;
+CCM.prototype.getTag = function() {
+    var tag = this.bytesXorWithBytes(this.Y, this.S0);
+    return tag;
 }
 CCM.prototype.formatting_NAP = function(plainDataBlock){
    
@@ -56,12 +51,15 @@ CCM.prototype.formatting_NAP = function(plainDataBlock){
         var assocData = this.formatAssociatedData();
         var payload = this.formatPayload(plainDataBlock);
         var finaldata = new Uint8Array(header.length +  assocData.length + payload.length);
+        
         finaldata.set(header);
-        finaldata.set(assocData,header.length);
-        finaldata.set(payload,header.length+assocData.length);
+        finaldata.set(assocData, header.length);
+        finaldata.set(payload, header.length + assocData.length);
+        
         return finaldata;
-    }else{
+    } else {
         var payload = this.formatPayload(plainDataBlock);
+        
         return payload;
     }
 
@@ -90,7 +88,8 @@ CCM.prototype.formatHeaderWithPayloadLength = function (payloadLength){
 
 CCM.prototype.formatPayload = function (plainDataBlock){
     var pad = plainDataBlock.length % CCM.block_size;
-    var buffer = new Uint8Array(plainDataBlock.length );
+    var buffer = new Uint8Array(CCM.block_size);
+    
     for (var i = 0; i < plainDataBlock.length; i++) {
         buffer[i]  = plainDataBlock[i];
     }
@@ -142,41 +141,76 @@ CCM.prototype.formatAssociatedData = function(){
         paddingLength = 0;
     }
     
-    buffer = buffer.subarray(0,payloadLength+ this.adata.length+ paddingLength); // or -1
+    buffer = buffer.subarray(0,payloadLength + this.adata.length + paddingLength); // or -1
+    
     return buffer;
 
 }
-
-CCM.prototype.AESEncryptBlock = function(blockArray) {
-    return FileUtils.base64ToByteArray(CryptoJS.AES.encrypt(CryptoJS.enc.Hex.parse(FileUtils.toHex(blockArray)),
-                    CryptoJS.enc.Hex.parse(FileUtils.toHex(this.key)),
-                    {mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.NoPadding }).toString());
+function byte2bits(a)
+{
+    var tmp = "";
+    for(var i = 128; i >= 1; i /= 2)
+        tmp += a&i?'1':'0';
+    return tmp;
 }
+CCM.prototype.AESEncryptBlock = function(blockArray) {
+    
+    //return sjcl.cipher.aes(this.key,new DataView(blockArray.buffer).getInt32(0, false))
+    var aes = new sjcl.cipher.aes(byte2bits(this.key));
+    var ct=aes.encrypt(byte2bits(blockArray));
+    //console.log(sjcl.encrypt(byte2bits(this.key),bits));
+    console.log(ct)
+    //return FileUtils.base64ToByteArray(sjcl.encrypt(byte2bits(this.key),byte2bits(blockArray)).ct);
+    //return FileUtils.base64ToByteArray(CryptoJS.AES.encrypt(blockArray,
+    //                this.key,
+    //                {mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.NoPadding }).toString());
+}
+
 CCM.prototype.encryptBlock = function(bytes) {
     this.bytes_left -= bytes.length;
     var subBlockCount = Math.ceil(bytes.length/CCM.block_size);
     var paddingCount = bytes.length % CCM.block_size;
     for (var i = 0; i < subBlockCount; i++) {
-        var subBlockLength = (i === subBlockCount - 1 && paddingCount > 0) ? paddingCount : CCM.block_size;
+        var subBlockLength = (i == subBlockCount - 1 && paddingCount > 0) ? paddingCount : CCM.block_size;
+        var subBlockBytes = bytes.subarray(i*CCM.block_size, i*CCM.block_size + subBlockLength);
         //var naplBytesLength = Math.ceil((this.adata.length/CCM.block_size * CCM.block_size)) + 3 * CCM.block_size;
         
-        
-        var naplBytes = this.formatting_NAP(bytes.subarray(i*CCM.block_size, subBlockLength));
+        var naplBytes = this.formatting_NAP(subBlockBytes);
          if (this.exit_next == -1) {
             this.exit_next = 0;
         
-            for (var i = 0; i < naplBytes.length; i+= CCM.block_size) {
-                
-                var xorredArray = this.bytesXorWithBytes(naplBytes.subarray(i*CCM.block_size,i*CCM.block_size + CCM.block_size-1),this.Y);
-                
-                //console.log("naplBytes.subarray("+(i*CCM.block_size)+","+(i*CCM.block_size + CCM.block_size+")");
-                this.Y = this.AESEncryptBlock(xorredArray);
+            for (var j = 0; j < naplBytes.length; j += CCM.block_size) {                
+                var xorBytes = this.bytesXorWithBytes(naplBytes.subarray(j, j + CCM.block_size), this.Y);
+                this.Y = this.AESEncryptBlock(xorBytes);
             }
         } else {
-            var xorredArray = this.bytesXorWithBytes(naplBytes.subarray(0,naplBytes.length),this.Y);
+            var xorredArray = this.bytesXorWithBytes(naplBytes.subarray(0, CCM.block_size), this.Y);
             this.Y = this.AESEncryptBlock(xorredArray);
         }
-            console.log(FileUtils.toHex((this.Y)));
+        
+        
+        var n = 0;
+        for (var j = 15; j > 0; j--) {
+            n = this.char_ctr[j];
+            this.char_ctr[j] = (n + 1) & 255 ;   
+            if (this.char_ctr[j] != '\0') {
+                break;
+            }
+        }
+        
+        var ctr_cipher = this.AESEncryptBlock(this.char_ctr);
+        var cipher = this.bytesXorWithBytes(subBlockBytes, ctr_cipher);
+
+        this.CC.set(cipher, i*CCM.block_size);
+        if (subBlockLength < CCM.block_size || (this.bytes_left == 0 && subBlockLength == CCM.block_size)) {
+            this.exit_next = 1;
+        }
     }
     
+    this.bytes_left -= this.CC.length;
+    
+    if (this.exit_next == 1 && subBlockLength < CCM.block_size) {
+        return this.CC.subarray(0, this.CC.length - (CCM.block_size-subBlockLength+paddingCount) );
+    }
+    return this.CC ;
 }
