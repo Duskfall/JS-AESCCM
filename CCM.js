@@ -155,15 +155,9 @@ function byte2bits(a)
 }
 CCM.prototype.AESEncryptBlock = function(blockArray) {
     
-    //return sjcl.cipher.aes(this.key,new DataView(blockArray.buffer).getInt32(0, false))
-    var aes = new sjcl.cipher.aes(byte2bits(this.key));
-    var ct=aes.encrypt(byte2bits(blockArray));
-    //console.log(sjcl.encrypt(byte2bits(this.key),bits));
-    console.log(ct)
-    //return FileUtils.base64ToByteArray(sjcl.encrypt(byte2bits(this.key),byte2bits(blockArray)).ct);
-    //return FileUtils.base64ToByteArray(CryptoJS.AES.encrypt(blockArray,
-    //                this.key,
-    //                {mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.NoPadding }).toString());
+    return FileUtils.base64ToByteArray( CryptoJS.AES.encrypt(CryptoJS.enc.Hex.parse(FileUtils.toHex(blockArray)),
+                                        CryptoJS.enc.Hex.parse(FileUtils.toHex(this.key)),
+                                        {mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.NoPadding }).toString());
 }
 
 CCM.prototype.encryptBlock = function(bytes) {
