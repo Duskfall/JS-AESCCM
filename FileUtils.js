@@ -1,7 +1,7 @@
 FileUtils = {}
 
 FileUtils.block_size = 16;
-FileUtils.buffer_size = 1024 * FileUtils.block_size;
+FileUtils.buffer_size = FileUtils.block_size;
 
 FileUtils.readBytes = function(file, from, to, done) {
     var reader = new FileReader();
@@ -19,10 +19,12 @@ FileUtils.readBytes = function(file, from, to, done) {
 }
 
 FileUtils.readNextBytes = function(file, from, to, callback) {
+    //console.log(from);
+    //console.log(to);
     if (to < file.size) {
         FileUtils.readBytes(file, from, to, function(result) {
             callback(result);
-            FileUtils.readNextBytes(file, from + FileUtils.buffer_size, to+FileUtils.buffer_size , callback);
+            FileUtils.readNextBytes(file, from + FileUtils.buffer_size, (to+FileUtils.buffer_size) /*< file.size ? to+FileUtils.buffer_size : file.size*/, callback);
         });
     } else {
         FileUtils.readBytes(file, from, file.size, function(result) {

@@ -1,5 +1,5 @@
 CCM.block_size = 16;
-CCM.blocks_count = 1024 * 1;
+CCM.blocks_count = 1;
 
 function CCM(key, iv, adata, tag_length, filesize) {
     this.key = key;
@@ -10,7 +10,7 @@ function CCM(key, iv, adata, tag_length, filesize) {
     this.bytes_left = filesize;
     this.exit_next = -1;
     
-    this.CC = new Uint8Array(this.tag_length + filesize );
+    this.CC = new Uint8Array(this.tag_length * CCM.blocks_count );
     this.Y = new Uint8Array(CCM.block_size);
     
     this.char_ctr = this.generate_counter_block();
@@ -179,32 +179,27 @@ CCM.prototype.encryptBlock = function(bytes) {
             }
         } else {
             var xorredArray = this.bytesXorWithBytes(naplBytes.subarray(0, CCM.block_size), this.Y);
+            
             this.Y = this.AESEncryptBlock(xorredArray);
         }
         
-        
-        var n = 0;
         for (var j = 15; j > 0; j--) {
-            n = this.char_ctr[j];
-            this.char_ctr[j] = (n + 1) & 255 ;   
-            if (this.char_ctr[j] != '\0') {
+            var n = this.char_ctr[j];
+            this.char_ctr[j] = (n + 1) & 255 ;
+            if (this.char_ctr[j] != 0) {
                 break;
             }
         }
         
         var ctr_cipher = this.AESEncryptBlock(this.char_ctr);
         var cipher = this.bytesXorWithBytes(subBlockBytes, ctr_cipher);
-
         this.CC.set(cipher, i*CCM.block_size);
         if (subBlockLength < CCM.block_size || (this.bytes_left == 0 && subBlockLength == CCM.block_size)) {
             this.exit_next = 1;
         }
     }
-    
-    this.bytes_left -= this.CC.length;
-    
     if (this.exit_next == 1 && subBlockLength < CCM.block_size) {
-        return this.CC.subarray(0, this.CC.length - (CCM.block_size-subBlockLength+paddingCount) );
+        return this.CC.subarray(0, subBlockLength);
     }
     return this.CC ;
 }
