@@ -1,11 +1,17 @@
 FileUtils = {}
 
 FileUtils.block_size = 16;
-FileUtils.buffer_size = FileUtils.block_size;
+FileUtils.buffer_size = 1024 * 64 *FileUtils.block_size ;
 
 FileUtils.readBytes = function(file, from, to, done) {
+    // TODO: check for filereadersync for mozilla
+    //var reader = new FileReaderSync() || new FileReader();
     var reader = new FileReader();
-    
+    //if (reader instanceof FileReaderSync) {
+    //    var blob = file.slice(from, to);
+    //    var result = reader.readAsArrayBuffer(blob);
+    //    return new Uint8Array(result);
+    //}
     reader.onload = (function(f) {
         var blob = f.slice(from, to);
         reader.readAsArrayBuffer(blob);

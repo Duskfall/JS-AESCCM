@@ -1,5 +1,5 @@
 CCM.block_size = 16;
-CCM.blocks_count = 1;
+CCM.blocks_count = 1024 *64;
 
 function CCM(key, iv, adata, tag_length, filesize) {
     this.key = key;
@@ -146,28 +146,19 @@ CCM.prototype.formatAssociatedData = function(){
     return buffer;
 
 }
-function byte2bits(a)
-{
-    var tmp = "";
-    for(var i = 128; i >= 1; i /= 2)
-        tmp += a&i?'1':'0';
-    return tmp;
-}
 CCM.prototype.AESEncryptBlock = function(blockArray) {
     
-    return FileUtils.base64ToByteArray( CryptoJS.AES.encrypt(CryptoJS.enc.Hex.parse(FileUtils.toHex(blockArray)),
-                                        CryptoJS.enc.Hex.parse(FileUtils.toHex(this.key)),
-                                        {mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.NoPadding }).toString());
+    return asmCrypto.AES_CBC.encrypt( blockArray, this.key, false);
 }
 
 CCM.prototype.encryptBlock = function(bytes) {
     this.bytes_left -= bytes.length;
     var subBlockCount = Math.ceil(bytes.length/CCM.block_size);
     var paddingCount = bytes.length % CCM.block_size;
+    var subBlockLength;
     for (var i = 0; i < subBlockCount; i++) {
-        var subBlockLength = (i == subBlockCount - 1 && paddingCount > 0) ? paddingCount : CCM.block_size;
+        subBlockLength = (i == subBlockCount - 1 && paddingCount > 0) ? paddingCount : CCM.block_size;
         var subBlockBytes = bytes.subarray(i*CCM.block_size, i*CCM.block_size + subBlockLength);
-        //var naplBytesLength = Math.ceil((this.adata.length/CCM.block_size * CCM.block_size)) + 3 * CCM.block_size;
         
         var naplBytes = this.formatting_NAP(subBlockBytes);
          if (this.exit_next == -1) {
@@ -194,12 +185,13 @@ CCM.prototype.encryptBlock = function(bytes) {
         var ctr_cipher = this.AESEncryptBlock(this.char_ctr);
         var cipher = this.bytesXorWithBytes(subBlockBytes, ctr_cipher);
         this.CC.set(cipher, i*CCM.block_size);
+        //console.log("this.CC.set("+FileUtils.toHex(cipher)+", "+i+"*"+CCM.block_size+")");
         if (subBlockLength < CCM.block_size || (this.bytes_left == 0 && subBlockLength == CCM.block_size)) {
             this.exit_next = 1;
         }
     }
     if (this.exit_next == 1 && subBlockLength < CCM.block_size) {
-        return this.CC.subarray(0, subBlockLength);
+        return this.CC.subarray(0, ((subBlockCount-1)*CCM.block_size + paddingCount));
     }
     return this.CC ;
 }
